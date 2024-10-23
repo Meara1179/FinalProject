@@ -31,55 +31,56 @@ bool service_off_operation(car_shared_mem* shm);
 
 int main(int argc, char *argv[])
 {
-    char mem_name[100] = "car";
+    char mem_name[100] = "/car";
     strcat(mem_name, argv[1]);
 
-    int fd = shm_open(mem_name, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
-    if (fd = -1)
+    int fd = shm_open(mem_name, O_CREAT | O_RDWR, 0666);
+    if (fd == -1)
     {
-        printf("Unable to access car %s", argv[1]);
+        printf("Unable to access CAR %s", argv[1]);
         return false;
     }
 
     car_shared_mem*  shared_mem_address = mmap(NULL, sizeof(car_shared_mem), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
     if (shared_mem_address == MAP_FAILED)
     {
+        printf("Mapping failed.");
         return false;
     }
 
     char* operation = argv[2];
 
-    if (operation == op_names[0])
+    if (strcmp(operation, op_names[0]) == 0)
     {
         open_operation(shared_mem_address);
     }
-    else if (operation == op_names[1])
+    else if (strcmp(operation, op_names[1]) == 0)
     {
         close_operation(shared_mem_address);
     }
-    else if (operation == op_names[2])
+    else if (strcmp(operation, op_names[2]) == 0)
     {
         stop_operation(shared_mem_address);
     }
-    else if (operation == op_names[3])
+    else if (strcmp(operation, op_names[3]) == 0)
     {
         service_on_operation(shared_mem_address);
     }
-    else if (operation == op_names[4])
+    else if (strcmp(operation, op_names[4]) == 0)
     {
         service_off_operation(shared_mem_address);
     }
-    else if (operation == op_names[5])
+    else if (strcmp(operation, op_names[5]) == 0)
     {
-        up_operation(shared_mem_address);
+        //up_operation(shared_mem_address);
     }
-    else if (operation == op_names[6])
+    else if (strcmp(operation, op_names[6]) == 0)
     {
-        down_operation(shared_mem_address);
+        //down_operation(shared_mem_address);
     }
     else
     {
-        printf("Invalid operation.");
+        printf("Invalid operation.\n");
     }
 
     return true;
@@ -89,17 +90,17 @@ bool up_operation(car_shared_mem* shm)
 {
     if (shm->individual_service_mode == 0)
     {
-        printf("Operation only allowed in service mode.");
+        printf("Operation only allowed in service mode.\n");
         return false;
     }
     else if (shm->status == "Open" || shm->status == "Opening")
     {
-        printf("Operation not allowed while doors are open.");
+        printf("Operation not allowed while doors are open.\n");
         return false;
     }
     else if (shm->status == "Between")
     {
-        printf("Operation not allowed while elevator is moving.");
+        printf("Operation not allowed while elevator is moving.\n");
         return false;
     }
 
@@ -136,17 +137,17 @@ bool down_operation(car_shared_mem* shm)
 {
     if (shm->individual_service_mode == 0)
     {
-        printf("Operation only allowed in service mode.");
+        printf("Operation only allowed in service mode.\n");
         return false;
     }
         else if (shm->status == "Open" || shm->status == "Opening")
     {
-        printf("Operation not allowed while doors are open.");
+        printf("Operation not allowed while doors are open.\n");
         return false;
     }
     else if (shm->status == "Between")
     {
-        printf("Operation not allowed while elevator is moving.");
+        printf("Operation not allowed while elevator is moving.\n");
         return false;
     }
 
