@@ -38,6 +38,7 @@ bool shared_mem_init(car_shared_mem* shm, char* mem_name)
   int fd = shm_open(name, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
   if (fd = -1)
   {
+    printf("shm_open failed.");
     return false;
   }
 
@@ -45,12 +46,14 @@ bool shared_mem_init(car_shared_mem* shm, char* mem_name)
   int trunc_status = ftruncate(fd, sizeof(shared_mem_size));
   if (trunc_status != 0)
   {
-      return false;
+    printf("ftruuncate failed.");
+    return false;
   }
 
   shared_mem_address = mmap(NULL, shared_mem_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
   if (shared_mem_address == MAP_FAILED)
   {
+    printf("mmap failed.");
     return false;
   }
 

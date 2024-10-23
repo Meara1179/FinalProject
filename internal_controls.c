@@ -20,61 +20,6 @@ char* op_names[] =
     "open", "close", "stop", "service_on", "service_off", "up", "down"
 };
 
-int internal_controls_create(char* name_par, char* operation)
-{
-    char mem_name[100] = "car";
-    strcat(mem_name, name_par);
-
-    int fd = shm_open(mem_name, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
-    if (fd = -1)
-    {
-        printf("Unable to access car %s", name_par);
-        return false;
-    }
-
-    car_shared_mem*  shared_mem_address = mmap(NULL, sizeof(car_shared_mem), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-    if (shared_mem_address == MAP_FAILED)
-    {
-        return false;
-    }
-
-    if (operation == op_names[0])
-    {
-        open_operation(shared_mem_address);
-    }
-    else if (operation == op_names[1])
-    {
-        close_operation(shared_mem_address);
-    }
-    else if (operation == op_names[2])
-    {
-        stop_operation(shared_mem_address);
-    }
-    else if (operation == op_names[3])
-    {
-        service_on_operation(shared_mem_address);
-    }
-    else if (operation == op_names[4])
-    {
-        service_off_operation(shared_mem_address);
-    }
-    else if (operation == op_names[5])
-    {
-        up_operation(shared_mem_address);
-    }
-    else if (operation == op_names[6])
-    {
-        down_operation(shared_mem_address);
-    }
-    else
-    {
-        printf("Invalid operation.");
-    }
-
-    return true;
-}
-
-
 bool up_operation(car_shared_mem* shm)
 {
     if (shm->individual_service_mode == 0)
@@ -94,12 +39,13 @@ bool up_operation(car_shared_mem* shm)
     }
 
     char next_floor[4];
+    char* cur_floor_ptr = &shm->current_floor[0];
     uint16_t cur_floor;
 
     pthread_mutex_lock(&shm->mutex);
-    if (shm->current_floor[0] == "B")
+    if (shm->current_floor[0] == 'B')
     {
-        cur_floor = atoi(shm->current_floor[1]);
+        scanf(shm->current_floor, "%d", &cur_floor);
         if (cur_floor == 1)
         {
             sprintf(next_floor, "%d", cur_floor);
@@ -111,10 +57,10 @@ bool up_operation(car_shared_mem* shm)
     }
     else
     {
-        cur_floor = atoi(shm->current_floor);
+        scanf(shm->current_floor, "%d", &cur_floor);
         sprintf(next_floor, "%d", cur_floor + 1);
     }
-    *shm->destination_floor = next_floor;
+    *shm->destination_floor = *next_floor;
     pthread_cond_signal(&shm->cond);
     pthread_mutex_unlock(&shm->mutex);
 
@@ -140,17 +86,18 @@ bool down_operation(car_shared_mem* shm)
     }
 
     char next_floor[4];
+    char* cur_floor_ptr = &shm->current_floor[0];
     uint16_t cur_floor;
 
     pthread_mutex_lock(&shm->mutex);
-    if (shm->current_floor[0] == "B")
+    if (shm->current_floor[0] == 'B')
     {
-        cur_floor = atoi(shm->current_floor[1]);
+        scanf(shm->current_floor, "%d", &cur_floor);
         sprintf(next_floor, "B%d", cur_floor + 1);
     }
     else
     {
-        cur_floor = atoi(shm->current_floor);
+        scanf(shm->current_floor, "%d", &cur_floor);
         if (cur_floor == 1)
         {
             sprintf(next_floor, "B%d", cur_floor);
@@ -161,7 +108,7 @@ bool down_operation(car_shared_mem* shm)
         }
     }
 
-    *shm->destination_floor = next_floor;
+    *shm->destination_floor = *next_floor;
     pthread_cond_signal(&shm->cond);
     pthread_mutex_unlock(&shm->mutex);
 
@@ -216,5 +163,60 @@ bool service_off_operation(car_shared_mem* shm)
     pthread_cond_signal(&shm->cond);
     pthread_mutex_unlock(&shm->mutex);
     
+    return true;
+}
+
+int main(char* name_par, char* operation)
+{
+    printf("Hi");
+    char mem_name[100] = "car";
+    strcat(mem_name, name_par);
+
+    int fd = shm_open(mem_name, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+    if (fd = -1)
+    {
+        printf("Unable to access car %s", name_par);
+        return false;
+    }
+
+    car_shared_mem*  shared_mem_address = mmap(NULL, sizeof(car_shared_mem), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    if (shared_mem_address == MAP_FAILED)
+    {
+        return false;
+    }
+
+    if (operation == op_names[0])
+    {
+        open_operation(shared_mem_address);
+    }
+    else if (operation == op_names[1])
+    {
+        close_operation(shared_mem_address);
+    }
+    else if (operation == op_names[2])
+    {
+        stop_operation(shared_mem_address);
+    }
+    else if (operation == op_names[3])
+    {
+        service_on_operation(shared_mem_address);
+    }
+    else if (operation == op_names[4])
+    {
+        service_off_operation(shared_mem_address);
+    }
+    else if (operation == op_names[5])
+    {
+        up_operation(shared_mem_address);
+    }
+    else if (operation == op_names[6])
+    {
+        down_operation(shared_mem_address);
+    }
+    else
+    {
+        printf("Invalid operation.");
+    }
+
     return true;
 }
