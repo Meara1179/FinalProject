@@ -88,53 +88,109 @@ int main(int argc, char *argv[])
 
 bool up_operation(car_shared_mem* shm)
 {
-    pthread_mutex_lock(&shm->mutex);
     if (shm->individual_service_mode == 0)
     {
         printf("Operation only allowed in service mode.\n");
-        pthread_mutex_unlock(&shm->mutex);
+
         return false;
     }
-    else if (strcmp(shm->status, "Open") == 0)
+    else if (strcmp(shm->status, "Open") == 0 || strcmp(shm->status, "Opening") == 0 || strcmp(shm->status, "Closing") == 0)
     {
         printf("Operation not allowed while doors are open.\n");
-        pthread_mutex_unlock(&shm->mutex);
+
         return false;
     }
     else if (strcmp(shm->status, "Between") == 0)
     {
         printf("Operation not allowed while elevator is moving.\n");
-        pthread_mutex_unlock(&shm->mutex);
+
         return false;
     }
 
     char next_floor[4];
-    char* cur_floor_ptr = &shm->current_floor[0];
     uint16_t cur_floor;
 
-    /*
+    char num[4];
+    int int_arr[3];
+
+    pthread_mutex_lock(&shm->mutex);
     if (shm->current_floor[0] == 'B')
     {
-        scanf(shm->current_floor, "%d", &cur_floor);
-        if (cur_floor == 1)
+        char basement[4];
+
+        int_arr[0] = (shm->current_floor[1] - 48);
+        if (shm->current_floor[2] != 0)
         {
-            sprintf(next_floor, "%d", cur_floor);
-            printf("%d\n", cur_floor);
+            int_arr[1] = (shm->current_floor[2] - 48);
+        }
+
+        int cat_int;
+        if (shm->current_floor[2] == 0)
+        {
+            cat_int = int_arr[0];
         }
         else
         {
-            sprintf(next_floor, "B%d", cur_floor - 1);
-            printf("%d\n", cur_floor - 1);
+            cat_int = (int_arr[0] * 10);
+            cat_int = cat_int + int_arr[1];
         }
+        if (cat_int != 1)
+        {
+            cat_int--;
+            basement[0] = 'B';
+        }
+
+        sprintf(num, "%d", cat_int);
+        strcat(basement, num);
+
+        strcpy(next_floor, basement);
     }
     else
     {
-        scanf(shm->current_floor, "%d", &cur_floor);
-        sprintf(next_floor, "%d", cur_floor + 1);
-        printf("%d\n", cur_floor + 1);
+        int_arr[0] = (shm->current_floor[0] - 48);
+        if (shm->current_floor[1] != 0)
+        {
+            int_arr[1] = (shm->current_floor[1] - 48);
+            if (shm->current_floor[2] != 0)
+            {
+                int_arr[2] = (shm->current_floor[2] - 48);
+            }
+        }
+
+        int cat_int;
+        if (shm->current_floor[1] == 0)
+        {
+            cat_int = int_arr[0];
+        }
+        else if (shm->current_floor[2] == 0)
+        {
+            cat_int = (int_arr[0] * 10);
+            cat_int = cat_int + int_arr[1];
+        }
+        else
+        {
+            cat_int = (int_arr[0] * 100);
+            if (int_arr[1] != 0)
+            {
+                cat_int = cat_int + (int_arr[1] * 10);
+            }
+            else
+            {
+                cat_int = cat_int + 10;
+            }
+            cat_int = cat_int + int_arr[2];
+        }
+        if (cat_int < 999)
+        {
+            cat_int++;
+        }
+
+        sprintf(num, "%d", cat_int);
+
+        strcpy(next_floor, num);        
     }
-    *shm->destination_floor = *next_floor;
-    */
+    strcpy(shm->destination_floor, next_floor);
+    
     pthread_cond_signal(&shm->cond);
     pthread_mutex_unlock(&shm->mutex);
 
@@ -143,54 +199,116 @@ bool up_operation(car_shared_mem* shm)
 
 bool down_operation(car_shared_mem* shm)
 {
-    pthread_mutex_lock(&shm->mutex);
     if (shm->individual_service_mode == 0)
     {
         printf("Operation only allowed in service mode.\n");
-        pthread_mutex_unlock(&shm->mutex);
         return false;
     }
-    else if (strcmp(shm->status, "Open") == 0)
+    else if (strcmp(shm->status, "Open") == 0 || strcmp(shm->status, "Opening") == 0 || strcmp(shm->status, "Closing") == 0)
     {
         printf("Operation not allowed while doors are open.\n");
-        pthread_mutex_unlock(&shm->mutex);
         return false;
     }
     else if (strcmp(shm->status, "Between") == 0)
     {
         printf("Operation not allowed while elevator is moving.\n");
-        pthread_mutex_unlock(&shm->mutex);
         return false;
     }
 
     char next_floor[4];
-    char* cur_floor_ptr = &shm->current_floor[0];
     uint16_t cur_floor;
 
-    /*
+    char num[4];
+    int int_arr[3];
+
+    pthread_mutex_lock(&shm->mutex);
     if (shm->current_floor[0] == 'B')
     {
-        //scanf(shm->current_floor, "%d", &cur_floor);
-        //sprintf(next_floor, "B%d", cur_floor + 1);
-        //printf("%d\n", cur_floor + 1);
-    }
-    else
-    {
-        //scanf(shm->current_floor, "%d", &cur_floor);
-        if (cur_floor == 1)
+        char basement[4];
+        basement[0] = 'B';
+
+        int_arr[0] = (shm->current_floor[1] - 48);
+        if (shm->current_floor[2] != 0)
         {
-            //sprintf(next_floor, "B%d", cur_floor);
-            //printf("%d\n", cur_floor);
+            int_arr[1] = (shm->current_floor[2] - 48);
+        }
+
+        int cat_int;
+        if (shm->current_floor[2] == 0)
+        {
+            cat_int = int_arr[0];
         }
         else
         {
-            //sprintf(next_floor, "%d", cur_floor - 1);
-            //printf("%d\n", cur_floor - 1);
+            cat_int = (int_arr[0] * 10);
+            cat_int = cat_int + int_arr[1];
+        }
+        if (cat_int < 99)
+        {
+            cat_int++;
+        }
+
+        sprintf(num, "%d", cat_int);
+        strcat(basement, num);
+
+        strcpy(next_floor, basement);
+    }
+    else
+    {
+        char basement[4];
+
+        int_arr[0] = (shm->current_floor[0] - 48);
+        if (shm->current_floor[1] != 0)
+        {
+            int_arr[1] = (shm->current_floor[1] - 48);
+            if (shm->current_floor[2] != 0)
+            {
+                int_arr[2] = (shm->current_floor[2] - 48);
+            }
+        }
+
+        int cat_int;
+        if (shm->current_floor[1] == 0)
+        {
+            cat_int = int_arr[0];
+        }
+        else if (shm->current_floor[2] == 0)
+        {
+            cat_int = (int_arr[0] * 10);
+            cat_int = cat_int + int_arr[1];
+        }
+        else
+        {
+            cat_int = (int_arr[0] * 100);
+            if (int_arr[1] != 0)
+            {
+                cat_int = cat_int + (int_arr[1] * 10);
+            }
+            else
+            {
+                cat_int = cat_int + 10;
+            }
+            cat_int = cat_int + int_arr[2];
+        }
+        if (cat_int == 1)
+        {
+            basement[0] = 'B';
+
+            sprintf(num, "%d", cat_int);
+            strcat(basement, num);
+
+            strcpy(next_floor, basement);   
+        }
+        else 
+        {
+            cat_int--;
+
+            sprintf(num, "%d", cat_int);
+            strcpy(next_floor, num);   
         }
     }
+    strcpy(shm->destination_floor, next_floor);
 
-    *shm->destination_floor = *next_floor;
-    */
     pthread_cond_signal(&shm->cond);
     pthread_mutex_unlock(&shm->mutex);
 
