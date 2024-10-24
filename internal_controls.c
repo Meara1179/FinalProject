@@ -34,17 +34,17 @@ int main(int argc, char *argv[])
     char mem_name[100] = "/car";
     strcat(mem_name, argv[1]);
 
-    int fd = shm_open(mem_name, O_CREAT | O_RDWR, 0666);
+    int fd = shm_open(mem_name, O_RDWR, 0666);
     if (fd == -1)
     {
-        printf("Unable to access CAR %s", argv[1]);
+        printf("Unable to access car %s\n", argv[1]);
         return false;
     }
 
     car_shared_mem*  shared_mem_address = mmap(NULL, sizeof(car_shared_mem), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
     if (shared_mem_address == MAP_FAILED)
     {
-        printf("Mapping failed.");
+        printf("Mapping failed.\n");
         return false;
     }
 
@@ -72,11 +72,11 @@ int main(int argc, char *argv[])
     }
     else if (strcmp(operation, op_names[5]) == 0)
     {
-        //up_operation(shared_mem_address);
+        up_operation(shared_mem_address);
     }
     else if (strcmp(operation, op_names[6]) == 0)
     {
-        //down_operation(shared_mem_address);
+        down_operation(shared_mem_address);
     }
     else
     {
@@ -88,19 +88,23 @@ int main(int argc, char *argv[])
 
 bool up_operation(car_shared_mem* shm)
 {
+    pthread_mutex_lock(&shm->mutex);
     if (shm->individual_service_mode == 0)
     {
         printf("Operation only allowed in service mode.\n");
+        pthread_mutex_unlock(&shm->mutex);
         return false;
     }
-    else if (shm->status == "Open" || shm->status == "Opening")
+    else if (strcmp(shm->status, "Open") == 0)
     {
         printf("Operation not allowed while doors are open.\n");
+        pthread_mutex_unlock(&shm->mutex);
         return false;
     }
-    else if (shm->status == "Between")
+    else if (strcmp(shm->status, "Between") == 0)
     {
         printf("Operation not allowed while elevator is moving.\n");
+        pthread_mutex_unlock(&shm->mutex);
         return false;
     }
 
@@ -108,25 +112,29 @@ bool up_operation(car_shared_mem* shm)
     char* cur_floor_ptr = &shm->current_floor[0];
     uint16_t cur_floor;
 
-    pthread_mutex_lock(&shm->mutex);
+    /*
     if (shm->current_floor[0] == 'B')
     {
         scanf(shm->current_floor, "%d", &cur_floor);
         if (cur_floor == 1)
         {
             sprintf(next_floor, "%d", cur_floor);
+            printf("%d\n", cur_floor);
         }
         else
         {
             sprintf(next_floor, "B%d", cur_floor - 1);
+            printf("%d\n", cur_floor - 1);
         }
     }
     else
     {
         scanf(shm->current_floor, "%d", &cur_floor);
         sprintf(next_floor, "%d", cur_floor + 1);
+        printf("%d\n", cur_floor + 1);
     }
     *shm->destination_floor = *next_floor;
+    */
     pthread_cond_signal(&shm->cond);
     pthread_mutex_unlock(&shm->mutex);
 
@@ -135,19 +143,23 @@ bool up_operation(car_shared_mem* shm)
 
 bool down_operation(car_shared_mem* shm)
 {
+    pthread_mutex_lock(&shm->mutex);
     if (shm->individual_service_mode == 0)
     {
         printf("Operation only allowed in service mode.\n");
+        pthread_mutex_unlock(&shm->mutex);
         return false;
     }
-        else if (shm->status == "Open" || shm->status == "Opening")
+    else if (strcmp(shm->status, "Open") == 0)
     {
         printf("Operation not allowed while doors are open.\n");
+        pthread_mutex_unlock(&shm->mutex);
         return false;
     }
-    else if (shm->status == "Between")
+    else if (strcmp(shm->status, "Between") == 0)
     {
         printf("Operation not allowed while elevator is moving.\n");
+        pthread_mutex_unlock(&shm->mutex);
         return false;
     }
 
@@ -155,26 +167,30 @@ bool down_operation(car_shared_mem* shm)
     char* cur_floor_ptr = &shm->current_floor[0];
     uint16_t cur_floor;
 
-    pthread_mutex_lock(&shm->mutex);
+    /*
     if (shm->current_floor[0] == 'B')
     {
-        scanf(shm->current_floor, "%d", &cur_floor);
-        sprintf(next_floor, "B%d", cur_floor + 1);
+        //scanf(shm->current_floor, "%d", &cur_floor);
+        //sprintf(next_floor, "B%d", cur_floor + 1);
+        //printf("%d\n", cur_floor + 1);
     }
     else
     {
-        scanf(shm->current_floor, "%d", &cur_floor);
+        //scanf(shm->current_floor, "%d", &cur_floor);
         if (cur_floor == 1)
         {
-            sprintf(next_floor, "B%d", cur_floor);
+            //sprintf(next_floor, "B%d", cur_floor);
+            //printf("%d\n", cur_floor);
         }
         else
         {
-            sprintf(next_floor, "%d", cur_floor - 1);
+            //sprintf(next_floor, "%d", cur_floor - 1);
+            //printf("%d\n", cur_floor - 1);
         }
     }
 
     *shm->destination_floor = *next_floor;
+    */
     pthread_cond_signal(&shm->cond);
     pthread_mutex_unlock(&shm->mutex);
 
