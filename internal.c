@@ -108,7 +108,6 @@ bool up_operation(car_shared_mem* shm)
     }
 
     char next_floor[4];
-    uint16_t cur_floor;
 
     char num[4];
     int int_arr[3];
@@ -216,7 +215,6 @@ bool down_operation(car_shared_mem* shm)
     }
 
     char next_floor[4];
-    uint16_t cur_floor;
 
     char num[4];
     int int_arr[3];
