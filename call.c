@@ -11,45 +11,43 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <errno.h>
+#include <ctype.h>
 
 void send_message(int fd, const char *buf);
 void send_looped(int fd, const void *buf, size_t size);
 void receive_loop(int fd, void *buf, size_t size);
 char *receive_message(int fd);
+int verify_input(char *argv[]);
 
 int main(int argc, char *argv[])
 {
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd == -1)
+    if (verify_input(argv))
     {
-        perror("socket()");
-        exit(1);
-    }
+        int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+        if (sockfd == -1)
+        {
+            perror("socket()");
+            exit(1);
+        }
 
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(3000);
-    const char* ipaddr = "127.0.0.1";
-    
-    if (inet_pton(AF_INET, ipaddr, &addr.sin_addr) != 1)
-    {
-        fprintf(stderr, "inet_pton(%s)\n", ipaddr);
-        exit(1);
-    }
+        struct sockaddr_in addr;
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(3000);
+        const char* ipaddr = "127.0.0.1";
+        
+        if (inet_pton(AF_INET, ipaddr, &addr.sin_addr) != 1)
+        {
+            fprintf(stderr, "inet_pton(%s)\n", ipaddr);
+            exit(1);
+        }
 
-    if (connect(sockfd, (const struct sockaddr *)&addr, sizeof(addr)) == -1)
-    {
-        printf("Unable to connect to elevator system.\n");
-        exit(1);
-    }
+        if (connect(sockfd, (const struct sockaddr *)&addr, sizeof(addr)) == -1)
+        {
+            printf("Unable to connect to elevator system.\n");
+            exit(1);
+        }
 
-    if(strcmp(argv[1], argv[2]) == 0)
-    {
-        printf("You are already on that floor!\n");
-    }
-    else
-    {
         char buf[1024];
 
         strcpy(buf, "CALL ");
@@ -65,45 +63,42 @@ int main(int argc, char *argv[])
         char *message = receive_message(sockfd);
 
         int i = 0;
-        char *msg_array[10];
+        char *msg_array[4];
         char *split_token = strtok(message, " ");
 
         while (split_token != NULL)
         {
             msg_array[i] = split_token;
-            split_token = strtok(NULL, " ");
             i++;
+            split_token = strtok(NULL, " ");
         }
 
-        char response[100];
         if (strcmp(msg_array[0], "CAR") == 0)
         {
+            char response[32];
             strcpy(response, "Car ");
             strcat(response, msg_array[1]);
             strcat(response, " is arriving.");
+            printf("%s\n", response);
         }
         else if (strcmp(msg_array[0], "UNAVAILABLE") == 0)
         {
-            printf("Sorry, no car is available to take this request.");
+            printf("Sorry, no car is available to take this request.\n");
         }
 
-        printf("%s\n", response);
-
         free(message);
-    }
 
+        if (shutdown(sockfd, SHUT_RDWR) == -1)
+        {
+            perror("shutdown()");
+            exit(1);
+        }
 
-
-    if (shutdown(sockfd, SHUT_RDWR) == -1)
-    {
-        perror("shutdown()");
-        exit(1);
-    }
-
-    if (close(sockfd) == -1)
-    {
-        perror("close()");
-        exit(1);
+        if (close(sockfd) == -1)
+        {
+            perror("close()");
+            exit(1);
+        }
     }
 }
 
@@ -160,4 +155,30 @@ char *receive_message(int fd)
     buf[len] = '\0';
     receive_loop(fd, buf, len);
     return buf;
+}
+
+int verify_input(char *argv[])
+{
+    if (strlen(argv[1]) > 3 || strlen(argv[2]) > 3)
+    {
+        printf("Invalid floor(s) specified.\n");
+        return 0;
+    }
+    else if (argv[1][0] != 'B' && isdigit(argv[1][0]) == 0)
+    {
+        printf("Invalid floor(s) specified.\n");
+        return 0;
+    }
+    else if (argv[2][0] != 'B' && isdigit(argv[2][0]) == 0)
+    {
+        printf("Invalid floor(s) specified.\n");
+        return 0;
+    }
+    else if(strcmp(argv[1], argv[2]) == 0)
+    {
+        printf("You are already on that floor!\n");
+        return 0;
+    }
+
+    return 1;
 }
