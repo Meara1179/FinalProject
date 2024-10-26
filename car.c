@@ -18,16 +18,19 @@
 
 #define MILLISECOND 1000;
 
+car_shared_mem *shm;
+char mem_name[100];
 char* name;
 char* lowest_floor;
 char* highest_floor;
 int delay;
-int prog_exit;
 
 // Function prototypes
+int str_to_int(char str[]);
 bool shared_mem_init(car_shared_mem* shm, char* mem_name);
 int cond_handler(car_shared_mem *shm);
 void *cond_watcher(void *p);
+void sigint_handler(int sig);
 
 int main(int argc, char *argv[])
 {
@@ -36,9 +39,8 @@ int main(int argc, char *argv[])
   highest_floor = argv[3];
   sscanf(argv[4], "%d", &delay);
   delay = delay * MILLISECOND;
-  prog_exit = 0;
 
-  char mem_name[100] = "car";
+  strcpy(mem_name, "car");
   strcat(mem_name, name);
 
   shm_unlink(mem_name);
@@ -70,12 +72,13 @@ int main(int argc, char *argv[])
   pthread_create(&tid, NULL, cond_watcher, shm);
   pthread_detach(tid);
 
-  while (prog_exit == 0)
+  signal(SIGINT, sigint_handler);
+  while (1)
   {
 
   }
 
-  return 1;
+  return 0;
 }
 
 bool shared_mem_init(car_shared_mem *shm, char* mem_name)
@@ -109,16 +112,94 @@ bool shared_mem_init(car_shared_mem *shm, char* mem_name)
   return true;
 }
 
+int str_to_int(char str[])
+{
+  int rtn = 0;
+
+  for (int i = 0; str[i] != '\0'; i++)
+  {
+    if (str[i] >= 48 && str[i] <= 57)
+    {
+      rtn = rtn * 10 + (str[i] - 48);
+    }
+  }
+
+  return rtn;
+}
+
+void* change_floor(void *p)
+{
+  car_shared_mem *shm = p;
+
+  bool cur_is_basement = false;
+  bool dest_is_basement = false;
+  int cur_int = str_to_int(shm->current_floor);
+  int dest_int = str_to_int(shm->destination_floor);
+
+  if (shm->current_floor[0] == 'B')
+  {
+    cur_is_basement = true;
+  }
+  if (shm->destination_floor[0] == 'B')
+  {
+    dest_is_basement = true;
+  }
+
+  char cur_floor[4];
+  char dest_floor[4];
+  while (cur_int != dest_int)
+  {
+    if (str_to_int(shm->destination_floor) > str_to_int(highest_floor))
+    {
+      pthread_mutex_lock(&shm->mutex);
+      strcpy(shm->destination_floor, highest_floor);
+      pthread_mutex_unlock(&shm->mutex);
+    }
+    if (dest_int > cur_int)
+    {
+      pthread_mutex_lock(&shm->mutex);
+      strcpy(shm->status, "Between");
+      pthread_mutex_unlock(&shm->mutex);
+      usleep(delay);
+      cur_int++;
+    }
+    else if (dest_int < cur_int)
+    {
+      pthread_mutex_lock(&shm->mutex);
+      strcpy(shm->status, "Between");
+      pthread_mutex_unlock(&shm->mutex);
+      usleep(delay);
+      cur_int--;
+    }
+    else if (dest_int == cur_int)
+    {
+      pthread_mutex_lock(&shm->mutex);
+      shm->open_button = 1;
+      pthread_mutex_unlock(&shm->mutex);
+      pthread_cond_signal(&shm->cond);
+    }
+    sprintf(cur_floor, "%d", cur_int);
+    pthread_mutex_lock(&shm->mutex);
+    strcpy(shm->current_floor, cur_floor);
+    strcpy(shm->status, "Closed");
+    pthread_mutex_unlock(&shm->mutex);
+  }
+  pthread_exit(NULL);
+}
+
 void* open_door(void *p)
 {
   car_shared_mem *shm = p;
   strcpy(shm->status, "Opening");
   usleep(delay);
   strcpy(shm->status, "Open");
-  usleep(delay);
-  strcpy(shm->status, "Closing");
-  usleep(delay);
-  strcpy(shm->status, "Closed");
+  if (shm->individual_service_mode != 1)
+  {
+    usleep(delay);
+    strcpy(shm->status, "Closing");
+    usleep(delay);
+    strcpy(shm->status, "Closed");
+  }
   pthread_exit(NULL);
 }
 
@@ -140,7 +221,9 @@ void* cond_watcher(void *p)
     pthread_cond_wait(&shm->cond, &shm->mutex);
     if (strcmp(shm->current_floor, shm->destination_floor) != 0)
     {
-      
+      pthread_t t_change_floor;
+      pthread_create(&t_change_floor, NULL, change_floor, shm);
+      pthread_detach(t_change_floor);
     }
     if (shm->open_button == 1)
     {
@@ -157,4 +240,13 @@ void* cond_watcher(void *p)
       pthread_detach(t_close_door);
     }
   }
+}
+
+void sigint_handler(int sig)
+{
+  signal(sig, SIG_IGN);
+
+  munmap(shm, sizeof(car_shared_mem));
+  shm_unlink(mem_name);
+  shm = NULL;
 }
