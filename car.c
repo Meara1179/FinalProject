@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "car_mem_struct.h"
 
@@ -21,11 +22,12 @@ char* name;
 char* lowest_floor;
 char* highest_floor;
 int delay;
+int prog_exit;
 
 // Function prototypes
 bool shared_mem_init(car_shared_mem* shm, char* mem_name);
 int cond_handler(car_shared_mem *shm);
-void *process_doors(void *p);
+void *cond_watcher(void *p);
 
 int main(int argc, char *argv[])
 {
@@ -34,6 +36,7 @@ int main(int argc, char *argv[])
   highest_floor = argv[3];
   sscanf(argv[4], "%d", &delay);
   delay = delay * MILLISECOND;
+  prog_exit = 0;
 
   char mem_name[100] = "car";
   strcat(mem_name, name);
@@ -64,8 +67,13 @@ int main(int argc, char *argv[])
   shared_mem_init(shm, mem_name);
 
   pthread_t tid;
-  pthread_create(&tid, NULL, process_doors, shm);
-  pthread_join(tid, NULL);
+  pthread_create(&tid, NULL, cond_watcher, shm);
+  pthread_detach(tid);
+
+  while (prog_exit == 0)
+  {
+
+  }
 
   return 1;
 }
@@ -101,25 +109,52 @@ bool shared_mem_init(car_shared_mem *shm, char* mem_name)
   return true;
 }
 
-void* process_doors(void *p)
+void* open_door(void *p)
 {
   car_shared_mem *shm = p;
-  //pthread_mutex_lock(&shm->mutex);
+  strcpy(shm->status, "Opening");
+  usleep(delay);
+  strcpy(shm->status, "Open");
+  usleep(delay);
+  strcpy(shm->status, "Closing");
+  usleep(delay);
+  strcpy(shm->status, "Closed");
+  pthread_exit(NULL);
+}
+
+void* close_door(void *p)
+{
+  car_shared_mem *shm = p;
+  strcpy(shm->status, "Closing");
+  usleep(delay);
+  strcpy(shm->status, "Closed");
+  pthread_exit(NULL);
+}
+
+void* cond_watcher(void *p)
+{
+  car_shared_mem *shm = p;
+  pthread_mutex_lock(&shm->mutex);
   for (;;)
   {
     pthread_cond_wait(&shm->cond, &shm->mutex);
+    if (strcmp(shm->current_floor, shm->destination_floor) != 0)
+    {
+      
+    }
     if (shm->open_button == 1)
     {
-      strcpy(shm->status, "Open");
       shm->open_button = 0;
-      printf("Hi\n");
+      pthread_t t_open_door;
+      pthread_create(&t_open_door, NULL, open_door, shm);
+      pthread_detach(t_open_door);
     }
     else if (shm->close_button == 1)
     {
-      strcpy(shm->status, "Closed");
       shm->close_button = 0;
-      printf("Hi\n");
+      pthread_t t_close_door;
+      pthread_create(&t_close_door, NULL, close_door, shm);
+      pthread_detach(t_close_door);
     }
-    pthread_mutex_unlock(&shm->mutex);
   }
 }
