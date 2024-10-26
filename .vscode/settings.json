@@ -4,6 +4,8 @@
         "wait.h": "c",
         "typeinfo": "c",
         "car_mem_struct.h": "c",
-        "stdint.h": "c"
+        "stdint.h": "c",
+        "signal.h": "c",
+        "in.h": "c"
     }
 }
