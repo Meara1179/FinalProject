@@ -2,6 +2,8 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <string.h>
+#include <stdio.h>
+#include <ctype.h>
 
 #include "car_mem_struct.h"
 
@@ -23,40 +25,70 @@ int main(int argc, char *argv[])
     int fd = shm_open(mem_name, O_RDWR, 438);
     if (fd == -1)
     {
-        printf("Unable to access car %s\n", argv[1]);
+        (void)printf("Unable to access car %s\n", argv[1]);
     }
-    car_shared_mem*  shm = mmap(NULL, sizeof(car_shared_mem), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-    if (shm == MAP_FAILED)
+    else
     {
-        printf("Mapping failed.\n");
+        car_shared_mem*  shm = mmap(NULL, sizeof(car_shared_mem), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+        if (shm == MAP_FAILED)
+        {
+            (void)printf("Mapping failed.\n");
+        }
+        else
+        {
+            pthread_mutex_lock(&shm->mutex);
+            for (;;)
+            {
+                (void)pthread_cond_wait(&shm->cond, &shm->mutex);
+                if (shm->emergency_stop == 1 && shm->emergency_mode == 0)
+                {
+                    (void)printf("The emergency stop button has been pressed!\n");
+                    shm->emergency_mode = 1;
+                }
+                if (shm->overload == 1 && shm->emergency_mode == 0)
+                {
+                    (void)printf("The overload sensor has been tripped!\n");
+                    shm->emergency_mode = 1;
+                }
+                else if (verify_data(shm) == 0)
+                {
+                    (void)printf("Data consistency error!\n");
+                    shm->emergency_mode = 1;
+                }
+            }
+        }
     }
 
-    pthread_mutex_lock(&shm->mutex);
-    for (;;)
-    {
-        pthread_cond_wait(&shm->cond, &shm->mutex);
-        if (shm->emergency_stop == 1 && shm->emergency_mode == 0)
-        {
-            (void*)printf("The emergency stop button has been pressed!\n");
-            shm->emergency_mode = 1;
-        }
-        if (shm-> overload == 1 && shm->emergency_mode == 0)
-        {
-            (void*)printf("The overload sensor has been tripped!");
-            shm->emergency_mode = 1;
-        }
-        if (shm->emergency_mode != 1)
-        {
-
-        }
-    }
 
     return 1;
 }
 
 int verify_data(car_shared_mem *shm)
 {
+    int valid;
 
+    if (verify_floors(shm->current_floor, shm->destination_floor) == 0)
+    {
+        valid = 0;
+    }
+    else if (verify_status(shm->status) == 0)
+    {
+        valid = 0;
+    }
+    else if (verify_fields(shm) == 0)
+    {
+        valid = 0;
+    }
+    else if (verify_door_obstruct(shm) == 0)
+    {
+        valid = 0;
+    }
+    else
+    {
+        valid = 1;
+    }
+
+    return valid;
 }
 
 int verify_floors(char *cur_floor, char *dest_floor)
@@ -90,7 +122,7 @@ int verify_status(char status[8])
     assert(status != NULL);
     assert(strlen(status) <= 8);
     int valid = 0;
-    char* valid_status[] = 
+    const char* valid_status[] = 
     {
         "Opening", "Open", "Closing", "Closed", "Between"
     };
@@ -150,5 +182,25 @@ int verify_fields(car_shared_mem *shm)
 
 int verify_door_obstruct(car_shared_mem *shm)
 {
+    assert(shm != NULL);
+    int valid = 0;
 
+    if (shm->door_obstruction == 1)
+    {
+        if (strcmp(shm->status, "Opening") == 0 || strcmp(shm->status, "Closing") == 0)
+        {
+            valid = 1;
+        }
+        else
+        {
+            valid = 0;
+        }
+    }
+    else
+    {
+        valid = 1;
+    } 
+
+    assert(valid == 0 || valid == 1);
+    return valid;
 }
