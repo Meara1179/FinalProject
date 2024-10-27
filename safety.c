@@ -8,6 +8,7 @@
 #include "car_mem_struct.h"
 
 // Function prototypes
+car_shared_mem* shared_memory_init(char *car_name);
 int verify_data(car_shared_mem *shm);
 int verify_floors(char *cur_floor, char *dest_floor);
 int verify_status(char status[8]);
@@ -18,23 +19,9 @@ int main(int argc, char *argv[])
 {
     assert(argc == 2);
     assert(strlen(argv[1]) <= 95);
+    car_shared_mem *shm = shared_memory_init(argv[1]);
 
-    char mem_name[100] = "/car";
-    strcat(mem_name, argv[1]);
-
-    int fd = shm_open(mem_name, O_RDWR, 438);
-    if (fd == -1)
-    {
-        (void)printf("Unable to access car %s\n", argv[1]);
-    }
-    else
-    {
-        car_shared_mem*  shm = mmap(NULL, sizeof(car_shared_mem), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-        if (shm == MAP_FAILED)
-        {
-            (void)printf("Mapping failed.\n");
-        }
-        else
+        if (shm != MAP_FAILED)
         {
             pthread_mutex_lock(&shm->mutex);
             for (;;)
@@ -43,24 +30,54 @@ int main(int argc, char *argv[])
                 if (shm->emergency_stop == 1 && shm->emergency_mode == 0)
                 {
                     (void)printf("The emergency stop button has been pressed!\n");
+                    fflush(stdout);
                     shm->emergency_mode = 1;
                 }
                 if (shm->overload == 1 && shm->emergency_mode == 0)
                 {
                     (void)printf("The overload sensor has been tripped!\n");
+                    fflush(stdout);
                     shm->emergency_mode = 1;
                 }
                 else if (verify_data(shm) == 0)
                 {
                     (void)printf("Data consistency error!\n");
+                    fflush(stdout);
                     shm->emergency_mode = 1;
                 }
             }
         }
-    }
-
 
     return 1;
+}
+
+car_shared_mem* shared_memory_init(char *car_name)
+{
+    char mem_name[100] = "/car";
+    strcat(mem_name, car_name);
+
+    int fd = shm_open(mem_name, O_RDWR, 438);
+    if (fd == -1)
+    {
+        (void)printf("Unable to access car %s\n", car_name);
+        fflush(stdout);
+    }
+    else
+    {
+        car_shared_mem* shm = mmap(NULL, sizeof(car_shared_mem), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+        if (shm == MAP_FAILED)
+        {
+            (void)printf("Mapping failed.\n");
+            fflush(stdout);
+        }
+        else
+        {
+            return shm;
+        }
+    }
+
+    car_shared_mem* shm = MAP_FAILED;
+    return shm;
 }
 
 int verify_data(car_shared_mem *shm)
