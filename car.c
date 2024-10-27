@@ -28,9 +28,11 @@ int delay;
 // Function prototypes
 int str_to_int(char str[]);
 bool shared_mem_init(car_shared_mem* shm, char* mem_name);
-int cond_handler(car_shared_mem *shm);
-void *cond_watcher(void *p);
+void* change_floor(void *p);
+void* open_door(void *p);
+void* close_door(void *p);
 void sigint_handler(int sig);
+
 
 int main(int argc, char *argv[])
 {
@@ -68,14 +70,32 @@ int main(int argc, char *argv[])
 
   shared_mem_init(shm, mem_name);
 
-  pthread_t tid;
-  pthread_create(&tid, NULL, cond_watcher, shm);
-  pthread_detach(tid);
-
   signal(SIGINT, sigint_handler);
+
+  pthread_mutex_lock(&shm->mutex);
   while (1)
   {
-
+    pthread_cond_wait(&shm->cond, &shm->mutex);
+    if (strcmp(shm->current_floor, shm->destination_floor) != 0)
+    {
+      pthread_t t_change_floor;
+      pthread_create(&t_change_floor, NULL, change_floor, shm);
+      pthread_detach(t_change_floor);
+    }
+    if (shm->open_button == 1)
+    {
+      shm->open_button = 0;
+      pthread_t t_open_door;
+      pthread_create(&t_open_door, NULL, open_door, shm);
+      pthread_detach(t_open_door);
+    }
+    else if (shm->close_button == 1)
+    {
+      shm->close_button = 0;
+      pthread_t t_close_door;
+      pthread_create(&t_close_door, NULL, close_door, shm);
+      pthread_detach(t_close_door);
+  }
   }
 
   return 0;
@@ -210,36 +230,6 @@ void* close_door(void *p)
   usleep(delay);
   strcpy(shm->status, "Closed");
   pthread_exit(NULL);
-}
-
-void* cond_watcher(void *p)
-{
-  car_shared_mem *shm = p;
-  pthread_mutex_lock(&shm->mutex);
-  for (;;)
-  {
-    pthread_cond_wait(&shm->cond, &shm->mutex);
-    if (strcmp(shm->current_floor, shm->destination_floor) != 0)
-    {
-      pthread_t t_change_floor;
-      pthread_create(&t_change_floor, NULL, change_floor, shm);
-      pthread_detach(t_change_floor);
-    }
-    if (shm->open_button == 1)
-    {
-      shm->open_button = 0;
-      pthread_t t_open_door;
-      pthread_create(&t_open_door, NULL, open_door, shm);
-      pthread_detach(t_open_door);
-    }
-    else if (shm->close_button == 1)
-    {
-      shm->close_button = 0;
-      pthread_t t_close_door;
-      pthread_create(&t_close_door, NULL, close_door, shm);
-      pthread_detach(t_close_door);
-    }
-  }
 }
 
 void sigint_handler(int sig)
