@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
     char mem_name[100] = "/car";
     strcat(mem_name, argv[1]);
 
-    int fd = shm_open(mem_name, O_RDWR, 0666);
+    int fd = shm_open(mem_name, O_RDWR, 438);
     if (fd == -1)
     {
         printf("Unable to access car %s\n", argv[1]);
